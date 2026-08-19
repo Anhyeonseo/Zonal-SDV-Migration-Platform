@@ -93,10 +93,18 @@ stateDiagram-v2
 
 ## 6. Planned evolution
 
-1. 현재 superloop baseline을 보존합니다.
-2. FreeRTOS를 최소 task 구성으로 도입하고 기존 board regression을 반복합니다.
-3. TJA1051T/3를 연결해 STM32를 external normal mode로 전환합니다.
-4. Raspberry Pi에 MCP2518FD와 SocketCAN을 구성합니다.
-5. 내부 `CentralSimulator`를 비활성화하고 실제 Linux command source로 대체합니다.
-6. 물리 bus fault, timeout, recovery와 장시간 traffic을 검증합니다.
+상세 로드맵은 [project-brief.md](project-brief.md) §6을 참고합니다. 요약하면 다음과 같습니다.
+
+1. 재현 가능한 CMake/CI 빌드를 갖추고, Edge node의 blocking 상한을 실측합니다.
+   실행 모델(superloop 유지 또는 RTOS 도입)은 이 측정 결과로 결정하며,
+   판단 근거는 [ADR-0001](adr/0001-scheduling-model-for-edge-nodes.md)에 기록합니다.
+2. TJA1051T/3를 연결해 STM32를 external normal mode로 전환합니다.
+3. Raspberry Pi에 MCP2518FD와 SocketCAN을 구성하고,
+   내부 `CentralSimulator`를 실제 Linux command source로 대체합니다.
+4. Rear Legacy ECU를 추가하고 공통 firmware layer를 분리합니다.
+5. VSS/KUKSA로 전송 경로를 추상화하고 정책 로직을 중앙 컨테이너 앱으로 옮깁니다.
+6. Ethernet Zone Controller(v1)를 도입해 CAN 신호와 서비스 메시지를 변환합니다.
+7. Zone Controller를 이종코어(v2, Cortex-A7 Linux + Cortex-M4)로 이식하고
+   application plane과 deterministic I/O plane 분리를 실측 검증합니다.
+8. 물리 bus fault, timeout, recovery와 장시간 traffic을 검증합니다.
 

@@ -95,7 +95,13 @@ The following artifacts should be added when available:
 - `candump` trace from the Raspberry Pi
 - Cable disconnect/reconnect fault trace
 - Long-duration traffic and error-counter report
-- FreeRTOS runtime/task supervision evidence
+- ADC/I2C blocking-time measurement under nominal and fault conditions
+  (see [ADR-0001](adr/0001-scheduling-model-for-edge-nodes.md))
+- Status transmission jitter distribution and deadline miss count
+
+Performance evidence must report the sample count together with p50, p95, p99, p99.9 and
+max, plus the deadline miss count. Averages alone are not sufficient. Raw data and the
+command used to produce it are stored alongside any summary chart.
 
 ## 6. Known limitations
 

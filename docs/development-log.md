@@ -140,6 +140,15 @@ STM32 superloop
   + timeout-based safe output
 ```
 
-Next gate: introduce FreeRTOS without changing CAN protocol, application policy or the
-existing board regression result.
+Next gate: establish a reproducible CMake/CI build, then measure the actual blocking
+bounds of the ADC and I2C paths under both nominal and fault conditions.
+
+Code inspection has already shown that the current loop is not fully non-blocking:
+`HAL_ADC_PollForConversion()` can block for up to 10 ms and each VL53L0X I2C access can
+block for up to 100 ms, which is the same order as the 100 ms status transmission period.
+
+The execution model for the edge nodes — keeping the superloop, moving I2C to
+interrupt/DMA, or introducing an RTOS — is therefore treated as an open question to be
+settled by measurement, not by assumption. The decision and its evidence are recorded in
+[ADR-0001](adr/0001-scheduling-model-for-edge-nodes.md).
 
