@@ -1,10 +1,14 @@
-# Automotive Zonal ECU Prototype
+# Automotive Zonal SDV Migration Platform
 
-Raspberry Pi 5 기반 **Central Computer**와 두 개의 STM32 기반 **Front / Rear Zonal ECU**를 CAN FD로 연결하는 차량 E/E 아키텍처 축소 프로젝트입니다.
+현대차그룹이 공개한 **CODA**(Computing & I/O Domain-based Architecture)의 **HPVC–Zone Controller 분리 원칙**을 상용 개발 보드로 축소해 검증하는 프로젝트입니다.
 
-각 Zonal ECU는 자신의 영역에 연결된 센서와 출력 장치를 직접 관리하고, Central Computer는 차량 모드와 상위 제어 정책, 전체 ECU 상태 감시, 로깅 및 진단을 담당합니다.
+> 기존 CAN ECU와 Zonal Ethernet 경로가 공존하는 전환 구조에서 CAN 신호를 서비스/VSS 데이터로 추상화하고, 중앙 정책 소프트웨어의 독립 배포와 실시간 I/O 경로의 장애 격리를 정량적으로 검증한다.
 
-현재 저장소에는 **NUCLEO-G474RE에서 검증한 Front Zonal ECU superloop baseline**이 구현되어 있습니다. 이후 동일한 firmware architecture를 기반으로 Rear Zonal ECU를 추가하고, Raspberry Pi 5와 실제 CAN FD bus를 통합할 예정입니다.
+Raspberry Pi 5가 **HPVC surrogate**(중앙 차량 컴퓨터) 역할을, STM32 보드들이 **Zone Controller**와 **Edge ECU** 역할을 맡습니다. Front 데이터는 Zone Controller를 거치는 Ethernet 경로로, Rear 데이터는 중앙 컴퓨터에 직접 연결된 legacy CAN 경로로 들어옵니다. 이 **의도적인 비대칭**이 분산형 CAN 구조에서 Zonal 구조로 이행하는 migration architecture를 비교하기 위한 실험 조건입니다.
+
+현재 저장소에는 **NUCLEO-G474RE에서 검증한 Edge ECU superloop baseline**이 구현되어 있습니다.
+
+설계 의도·주장 범위·로드맵의 단일 기준 문서는 [docs/project-brief.md](docs/project-brief.md)입니다.
 
 ## Current milestone
 
@@ -181,40 +185,41 @@ Rear Zonal ECU heartbeat timeout
 ## Repository layout
 
 ```text
-automotive-zonal-ecu/
+automotive-zonal-control-system/
 ├── README.md
-├── .gitignore
+├── THIRD_PARTY_NOTICES.md
 ├── docs/
+│   ├── project-brief.md        # 포지셔닝·주장 규율·로드맵의 단일 기준
 │   ├── architecture.md
 │   ├── requirements.md
+│   ├── traceability.md         # 요구사항 ↔ 검증 증거 매핑
 │   ├── hardware-setup.md
 │   ├── can-protocol.md
 │   ├── verification.md
-│   └── development-log.md
-└── firmware/
-    └── front-zonal-ecu/
-        ├── App/          # 직접 설계한 application 및 service 코드
-        ├── Inc/          # CubeMX generated header
-        ├── Src/          # CubeMX generated code와 main integration
-        ├── Drivers/      # STM32 HAL, CMSIS, VL53L0X API
-        ├── Startup/      # MCU startup assembly
-        └── Tests/        # host unit test
-```
-
-Rear Zonal ECU와 Raspberry Pi 구현은 실제 코드 개발을 시작하는 시점에 다음 구조로 확장합니다.
-
-```text
-automotive-zonal-ecu/
-├── central-computer/
+│   ├── development-log.md
+│   ├── adr/                    # 설계 판단 기록
+│   └── spikes/                 # 타당성 검증 (Spike-C 등)
 ├── firmware/
-│   ├── common/
-│   ├── front-zonal-ecu/
-│   └── rear-zonal-ecu/
-└── platform/
-    └── yocto/
+│   ├── common/                 # 공통 layer (Phase 2에서 분리)
+│   ├── front-zonal-ecu/        # Front Edge ECU — G474RE (현재 baseline)
+│   │   ├── App/                #   직접 설계한 application 및 service 코드
+│   │   ├── Inc/                #   CubeMX generated header
+│   │   ├── Src/                #   CubeMX generated code와 main integration
+│   │   ├── Drivers/            #   STM32 HAL, CMSIS, VL53L0X API
+│   │   ├── Startup/            #   MCU startup assembly
+│   │   └── Tests/              #   host unit test
+│   ├── rear-legacy-ecu/        # Rear Legacy ECU — G474RE (Phase 2)
+│   └── zone-controller-v1/     # Zone Controller v1 — H723ZG (Phase 4)
+├── central-computer/           # HPVC surrogate — Raspberry Pi 5
+│   ├── vehicle-app/            #   정책 로직 (컨테이너, Phase 3)
+│   ├── providers/              #   CAN / service → VSS provider
+│   └── vss/                    #   VSS 신호트리 정의
+├── platform/
+│   └── yocto/                  # meta-zonal-sdv 등 (Release C)
+└── tools/
 ```
 
-최종 directory 구조는 공통 firmware module의 재사용 범위와 Yocto integration 방식에 따라 조정할 수 있습니다.
+`firmware/front-zonal-ecu/`는 현재 명칭을 유지합니다. Front **Edge** ECU로의 디렉터리 rename은 참조와 문서를 함께 갱신하는 별도 PR에서 처리합니다. 자세한 내용은 [project-brief.md](docs/project-brief.md) §2를 참고하십시오.
 
 ## Firmware modules
 
@@ -235,12 +240,16 @@ Rear Zonal ECU 개발 단계에서는 CAN, time, diagnostics와 hardware-indepen
 
 상세 설계와 검증 기록은 `docs/`에서 관리합니다.
 
+* **[Project brief](docs/project-brief.md)** — 포지셔닝, 주장 규율, 로드맵의 단일 기준
 * [Architecture](docs/architecture.md)
 * [Requirements](docs/requirements.md)
+* [Traceability](docs/traceability.md) — 요구사항 ↔ 검증 증거 매핑
 * [Hardware setup](docs/hardware-setup.md)
 * [CAN protocol](docs/can-protocol.md)
 * [Verification](docs/verification.md)
 * [Development log](docs/development-log.md)
+* [ADR](docs/adr/) — 설계 판단 기록
+* [Spikes](docs/spikes/) — 타당성 검증
 
 ## Build
 
@@ -273,23 +282,44 @@ Rear Zonal ECU 개발 단계에서는 CAN, time, diagnostics와 hardware-indepen
 
 ## Roadmap
 
+상세 내용과 Acceptance Criteria는 [docs/project-brief.md](docs/project-brief.md) §6에 있습니다.
+
+**완료 — Baseline**
+
 * [x] STM32 peripheral and sensor bring-up
-* [x] Front Zonal ECU superloop baseline
+* [x] Edge ECU superloop baseline
 * [x] CAN FD internal loopback and interrupt RX
 * [x] Protocol, service, application modularization
 * [x] Host unit tests and board regression test
-* [ ] FreeRTOS task architecture
-* [ ] TJA1051T/3 external CAN FD transceiver integration
-* [ ] Front Zonal ECU external CAN FD communication
-* [ ] Common firmware layer 분리
-* [ ] Rear Zonal ECU firmware 구현
-* [ ] Raspberry Pi MCP2518FD and SocketCAN integration
-* [ ] Real three-node CAN FD communication
-* [ ] ECU heartbeat 및 communication timeout monitoring
-* [ ] Multi-ECU fault isolation and degraded operation
-* [ ] Linux service lifecycle, logging and diagnostics
-* [ ] Device Tree integration
-* [ ] Yocto image integration
+
+**Release A — Zonal SDV MVP**
+
+* [ ] Phase 0A: CMake/CI, traceability, license policy
+* [ ] Phase 0B: ADC/I2C blocking 실측 → [ADR-0001](docs/adr/0001-scheduling-model-for-edge-nodes.md) 결정
+* [ ] Phase 1: 물리 CAN FD, DBC, SocketCAN, `CentralSimulator` 제거
+* [ ] Phase 2: Rear Legacy ECU, 공통 firmware layer 분리, fault isolation
+* [ ] Phase 3: VSS/KUKSA 추상화, 정책 앱 컨테이너화, 독립 재배포 검증
+
+**Release B — Ethernet Zone Controller와 RTOS 연구**
+
+* [ ] Phase 4A: Zone Controller v1 (H723ZG), lightweight service transport
+* [ ] Phase 4B: 동일 보드 superloop vs FreeRTOS A/B 비교, 우선순위 역전 재현
+
+**Release C — 이종코어 Zone Controller**
+
+* [ ] Spike-C: [MP157 보드 타당성 검증](docs/spikes/mp157-board-feasibility.md)
+* [ ] Phase 6A: 부트체인(TF-A/U-Boot/Linux), Device Tree, kernel config
+* [ ] Phase 6B: M4 FreeRTOS + remoteproc/RPMsg
+* [ ] Phase 6C: peripheral ownership 비교 (Linux-owned vs M4-owned CAN)
+* [ ] Phase 6D: 장애 격리 (userspace crash / A7 reboot / full reset)
+* [ ] Phase 6E: Yocto custom layer, SPDX SBOM
+
+**Release D — 보안·OTA·진단**
+
+* [ ] Phase 5A: SecOC-lite
+* [ ] Phase 5B: ISO-TP + UDS download
+* [ ] Phase 5C: A/B firmware update, power-cut rollback
+* [ ] Phase 7: UDS over CAN, Ethernet 진단 경로
 
 ## Engineering boundary
 
@@ -299,8 +329,22 @@ Rear Zonal ECU 개발 단계에서는 CAN, time, diagnostics와 hardware-indepen
 
 * AUTOSAR compliance
 * ISO 26262 compliance
-* ASIL qualification
+* ASIL qualification / lockstep core
 * production-ready automotive ECU
 * production vehicle network security
+* ASPICE 평가
+* 정식 SOME/IP 구현
+* 양산급 HSM/PKI key provisioning 및 fleet OTA backend
+
+### 주장 규율
+
+공개 아키텍처와의 관계를 서술할 때는 현대차그룹·계열사의 **공식 공개 자료만** 근거로 사용하고, 공개되지 않은 양산 내부 구현은 추정하지 않습니다. 다음 표현은 사용하지 않습니다.
+
+* "현대·기아 양산 E/E 아키텍처를 재현했다"
+* "현대차그룹이 KUKSA/VSS 또는 이 프로젝트의 프로토콜을 사용한다"
+* "S32G/R-Car 또는 AUTOSAR를 재현했다"
+* "컨테이너 교체만으로 양산급 OTA를 구현했다"
+
+정확한 표현은 [docs/project-brief.md](docs/project-brief.md) §0을 따릅니다. 생산 환경과의 차이(Automotive Ethernet, 차량용 HPVC 하드웨어, SOME/IP, AUTOSAR Classic OS, 양산 OTA)는 같은 문서 §4.3에 정리돼 있습니다.
 
 대신 명확한 responsibility split, CAN contract, timeout 처리, fault state, modular firmware, host test와 hardware verification을 통해 차량 ECU software architecture의 핵심 개념을 단계적으로 구현하는 것을 목표로 합니다.
